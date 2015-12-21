@@ -39,16 +39,15 @@ namespace Cm\RedisSession;
  *  - Compression can be enabled, disabled, or reconfigured on the fly with no loss of session data.
  *  - Expiration is handled by Redis. No garbage collection needed.
  *  - Logs when sessions are not written due to not having or losing their lock.
- *  - Limits the number of concurrent lock requests before a 503 error is returned.
+ *  - Limits the number of concurrent lock requests.
  *
  * Locking Algorithm Properties:
  *  - Only one process may get a write lock on a session.
  *  - A process may lose it's lock if another process breaks it, in which case the session will not be written.
  *  - The lock may be broken after BREAK_AFTER seconds and the process that gets the lock is indeterminate.
- *  - Only MAX_CONCURRENCY processes may be waiting for a lock for the same session or else a 503 error is returned.
+ *  - Only MAX_CONCURRENCY processes may be waiting for a lock for the same session or else a ConcurrentConnectionsExceededException will be thrown.
  *  - Detects crashed processes to prevent session deadlocks (Linux only).
  *  - Detects inactive waiting processes to prevent false-positives in concurrency throttling.
- *
  */
 
 use Cm\RedisSession\Handler\ConfigInterface;
