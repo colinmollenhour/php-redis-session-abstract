@@ -1,5 +1,4 @@
-<?xml version="1.0"?>
-<!--
+<?php
 /*
 ==New BSD License==
 
@@ -16,7 +15,7 @@ modification, are permitted provided that the following conditions are met:
       documentation and/or other materials provided with the distribution.
     * The name of Colin Mollenhour may not be used to endorse or promote products
       derived from this software without specific prior written permission.
-    * The module name must remain Cm_RedisSession.
+    * Redistributions in any form must not change the Cm_RedisSession namespace.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -29,20 +28,73 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
--->
-<config>
-  <modules>
-    <Cm_RedisSession>
-      <version>0.2</version>
-    </Cm_RedisSession>
-  </modules>
-  <global>
-    <models>
-      <core_mysql4>
-        <rewrite>
-          <session>Cm_RedisSession_Model_Session</session>
-        </rewrite>
-      </core_mysql4>
-    </models>
-  </global>
-</config>
+namespace Cm\RedisSession\Handler;
+
+interface LoggerInterface
+{
+    /**
+     * Emergency: system is unusable
+     */
+    const EMERGENCY     = 0;
+
+    /**
+     * Alert: action must be taken immediately
+     */
+    const ALERT         = 1;
+
+    /**
+     * Critical: critical conditions
+     */
+    const CRITICAL      = 2;
+
+    /**
+     * Error: error conditions
+     */
+    const ERROR         = 3;
+
+    /**
+     * Warning: warning conditions
+     */
+    const WARNING       = 4;
+
+    /**
+     * Notice: normal but significant condition
+     */
+    const NOTICE        = 5;
+
+    /**
+     * Informational: informational messages
+     */
+    const INFO          = 6;
+
+    /**
+     * Debug: debug messages
+     */
+    const DEBUG         = 7;
+
+    /**
+     * Set log level
+     *
+     * @param int $level
+     * @return void
+     */
+    public function setLogLevel($level);
+
+    /**
+     * Log message
+     *
+     * @param string $message
+     * @param string $level
+     * @param string $file
+     * @return void
+     */
+    public function log($message, $level);
+
+    /**
+     * Log exception
+     *
+     * @param \Exception $e
+     * @return void
+     */
+    public function logException(\Exception $e);
+}
