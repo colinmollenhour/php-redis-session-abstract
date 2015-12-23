@@ -1,4 +1,4 @@
-<?php PHP_SAPI == 'cli' or die('CLI only.');
+<?php
 /*
 ==New BSD License==
 
@@ -15,6 +15,7 @@ modification, are permitted provided that the following conditions are met:
       documentation and/or other materials provided with the distribution.
     * The name of Colin Mollenhour may not be used to endorse or promote products
       derived from this software without specific prior written permission.
+    * Redistributions in any form must not change the Cm_RedisSession namespace.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -27,18 +28,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+namespace Cm\RedisSession;
 
-require 'app/Mage.php';
-Mage::app();
-
-if (empty($argv[1])) {
-  die('Must specify session id.');
+class ConnectionFailedException extends \Exception
+{
 }
-$sessionId = $argv[1];
-
-$redisSession = new Cm_RedisSession_Model_Session;
-$sessionData = $redisSession->_inspectSession($sessionId);
-$data = $sessionData['data'];
-unset($sessionData['data']);
-var_dump($sessionData);
-echo "DATA:\n$data\n";
