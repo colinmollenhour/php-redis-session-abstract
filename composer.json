@@ -3,7 +3,7 @@
     "type":"library",
     "license":"BSD-3-Clause",
     "homepage":"https://github.com/colinmollenhour/php-redis-session-abstract",
-    "description":"A Redis-based session handler with optimistic locking.",
+    "description":"A Redis-based session handler with optimistic locking",
     "authors":[
         {
             "name":"Colin Mollenhour"
@@ -17,7 +17,7 @@
     },
     "autoload": {
         "psr-0": {
-            "Cm\\RedisSession": "lib"
+            "Cm\\RedisSession\\": "src/"
         }
     }
 }
