@@ -628,6 +628,16 @@ class Handler implements \SessionHandlerInterface
     }
 
     /**
+     * Get the number of failed lock attempts
+     *
+     * @return int
+     */
+    public function getFailedLockAttempts()
+    {
+        return $this->failedLockAttempts;
+    }
+
+    /**
      * Get lock lifetime
      *
      * @return int|mixed
@@ -664,9 +674,10 @@ class Handler implements \SessionHandlerInterface
 
             // Neither bot nor first write
             if ($lifeTime === null) {
-                $this->_lifeTime = self::DEFAULT_LIFETIME;
+                $lifeTime = $this->config->getLifetime();
             }
 
+            $this->_lifeTime = $lifeTime;
             if ($this->_lifeTime < $this->_minLifetime) {
                 $this->_lifeTime = $this->_minLifetime;
             }

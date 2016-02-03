@@ -103,6 +103,13 @@ interface ConfigInterface
     public function getMaxConcurrency();
 
     /**
+     * Get the normal session lifetime
+     *
+     * @return int
+     */
+    public function getLifetime();
+
+    /**
      * Get the maximum session lifetime
      *
      * @return int
