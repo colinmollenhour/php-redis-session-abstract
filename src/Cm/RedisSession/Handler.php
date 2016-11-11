@@ -533,7 +533,7 @@ class Handler implements \SessionHandlerInterface
         if ( ! empty($setData)) {
             $this->_redis->hMSet($sessionId, $setData);
         }
-        $this->_redis->expire($sessionId, min($this->getLifeTime(), $this->_maxLifetime));
+        $this->_redis->expire($sessionId, 3600*6); // Expiration will be set to correct value when session is written
         $this->_redis->exec();
 
         // Reset flag in case of multiple session read/write operations
