@@ -157,4 +157,10 @@ interface ConfigInterface
      * @return int
      */
     public function getBreakAfter();
+
+    /**
+     * Get number of seconds to wait before completely failing to break the lock
+     * @return int
+     */
+    public function getFailAfter();
 }

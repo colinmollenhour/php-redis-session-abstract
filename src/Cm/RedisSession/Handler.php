@@ -61,11 +61,6 @@ class Handler implements \SessionHandlerInterface
     const SLEEP_TIME         = 500000;
 
     /**
-     * Try to break lock for at most this many seconds
-     */
-    const FAIL_AFTER         = 15;
-
-    /**
      * Try to detect zombies every this many tries
      */
     const DETECT_ZOMBIES     = 20;
@@ -109,6 +104,11 @@ class Handler implements \SessionHandlerInterface
      * Try to break the lock after this many seconds
      */
     const DEFAULT_BREAK_AFTER           = 30;
+
+    /**
+     * Try to break lock for at most this many seconds
+     */
+    const DEFAULT_FAIL_AFTER            = 15;
 
     /**
      * The session lifetime for non-bots on the first write
@@ -191,6 +191,11 @@ class Handler implements \SessionHandlerInterface
     private $_breakAfter;
 
     /**
+     * @var int
+     */
+    private $_failAfter;
+
+    /**
      * @var boolean
      */
     private $_useLocking;
@@ -271,12 +276,13 @@ class Handler implements \SessionHandlerInterface
         $this->_compressionThreshold =  $this->config->getCompressionThreshold() ?: self::DEFAULT_COMPRESSION_THRESHOLD;
         $this->_compressionLibrary =    $this->config->getCompressionLibrary() ?: self::DEFAULT_COMPRESSION_LIBRARY;
         $this->_maxConcurrency =        $this->config->getMaxConcurrency() ?: self::DEFAULT_MAX_CONCURRENCY;
+        $this->_failAfter =             $this->config->getFailAfter() ?: self::DEFAULT_FAIL_AFTER;
         $this->_maxLifetime =           $this->config->getMaxLifetime() ?: self::DEFAULT_MAX_LIFETIME;
         $this->_minLifetime =           $this->config->getMinLifetime() ?: self::DEFAULT_MIN_LIFETIME;
         $this->_useLocking =            $this->config->getDisableLocking() ?: self::DEFAULT_DISABLE_LOCKING;
 
-        // Use sleep time multiplier so break time is in seconds
-        $this->_failAfter = (int) round((1000000 / self::SLEEP_TIME) * self::FAIL_AFTER);
+        // Use sleep time multiplier so fail after time is in seconds
+        $this->_failAfter = (int) round((1000000 / self::SLEEP_TIME) * $this->_failAfter);
 
         // Connect and authenticate
         $this->_redis = new \Credis_Client($host, $port, $timeout, $persistent, 0, $pass);
