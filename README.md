@@ -16,7 +16,6 @@
 - Detects crashed processes to prevent session deadlocks (Linux only).
 - Gives shorter session lifetimes to bots and crawlers to reduce wasted resources.
 - Locking can be disabled entirely
-- Requires PHP >= 5.3. Yes, this is a feature. You're welcome. ;)
 
 #### Locking Algorithm Properties: ####
 - Only one process may get a write lock on a session.
