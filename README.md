@@ -26,10 +26,10 @@
 ### Compression ##
 
 Session data compresses very well so using compression is a great way to increase your capacity without
-dedicating a ton of RAM to Redis. Compression can be disabled by setting the `compression_threshold` to 0.
+dedicating a ton of RAM to Redis and reducing network utilization.
 The default `compression threshold` is 2048 bytes so any session data equal to or larger than this size
-will be compressed with the chosen `compression_lib` which is 'gzip' by default. However, both lzf and
-snappy offer much faster compression with comparable compression ratios so I definitely recommend using
+will be compressed with the chosen `compression_lib` which is `gzip` by default.  Compression can be disabled by setting the `compression_lib` to `none`. However, both `lzf` and
+`snappy` offer much faster compression with comparable compression ratios so I definitely recommend using
 one of these if you have root. lzf is easy to install via pecl:
 
     sudo pecl install lzf
