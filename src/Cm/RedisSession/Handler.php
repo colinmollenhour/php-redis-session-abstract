@@ -279,19 +279,73 @@ class Handler implements \SessionHandlerInterface
         // Use sleep time multiplier so fail after time is in seconds
         $this->_failAfter = (int) round((1000000 / self::SLEEP_TIME) * $this->_failAfter);
 
+        // Sentinel config
+        $sentinelServers =         $this->config->getSentinelServers();
+        $sentinelMaster =          $this->config->getSentinelMaster();
+        $sentinelVerifyMaster =    $this->config->getSentinelVerifyMaster();
+        $sentinelConnectRetries =  $this->config->getSentinelConnectRetries();
+
         // Connect and authenticate
-        $this->_redis = new \Credis_Client($host, $port, $timeout, $persistent, 0, $pass);
-        if ($this->hasConnection() == false) {
-            throw new ConnectionFailedException('Unable to connect to Redis');
+        if ($sentinelServers && $sentinelMaster) {
+            $servers = preg_split('/\s*,\s*/', trim($sentinelServers), NULL, PREG_SPLIT_NO_EMPTY);
+            $sentinel = NULL;
+            $exception = NULL;
+            for ($i = 0; $i <= $sentinelConnectRetries; $i++) // Try to connect to sentinels in round-robin fashion
+            foreach ($servers as $server) {
+                try {
+                    $sentinelClient = new \Credis_Client($server, NULL, $timeout, $persistent);
+                    $sentinelClient->forceStandalone();
+                    $sentinelClient->setMaxConnectRetries(0);
+                    $sentinel = new \Credis_Sentinel($sentinelClient);
+                    $sentinel
+                        ->setClientTimeout($timeout)
+                        ->setClientPersistent($persistent);
+                    $redisMaster = $sentinel->getMasterClient($sentinelMaster);
+                    if ($pass) $redisMaster->auth($pass);
+
+                    // Verify connected server is actually master as per Sentinel client spec
+                    if ($sentinelVerifyMaster) {
+                        $roleData = $redisMaster->role();
+                        if ( ! $roleData || $roleData[0] != 'master') {
+                            usleep(100000); // Sleep 100ms and try again
+                            $redisMaster = $sentinel->getMasterClient($sentinelMaster);
+                            if ($pass) $redisMaster->auth($pass);
+                            $roleData = $redisMaster->role();
+                            if ( ! $roleData || $roleData[0] != 'master') {
+                                throw new Exception('Unable to determine master redis server.');
+                            }
+                        }
+                    }
+                    if ($this->_dbNum || $persistent) $redisMaster->select(0);
+
+                    $this->_redis = $redisMaster;
+                    break 2;
+                } catch (Exception $e) {
+                    unset($sentinelClient);
+                    $exception = $e;
+                }
+            }
+            unset($sentinel);
+
+            if ( ! $this->_redis) {
+                throw new ConnectionFailedException('Unable to connect to a Redis: '.$exception->getMessage(), $exception);
+            }
         }
+        else {
+            $this->_redis = new \Credis_Client($host, $port, $timeout, $persistent, 0, $pass);
+            if ($this->hasConnection() == false) {
+                throw new ConnectionFailedException('Unable to connect to Redis');
+            }
+        }
+
         // Destructor order cannot be predicted
         $this->_redis->setCloseOnDestruct(false);
         $this->_log(
             sprintf(
                 "%s initialized for connection to %s:%s after %.5f seconds",
                 get_class($this),
-                $host,
-                $port,
+                $this->_redis->getHost(),
+                $this->_redis->getPort(),
                 (microtime(true) - $timeStart)
             )
         );
