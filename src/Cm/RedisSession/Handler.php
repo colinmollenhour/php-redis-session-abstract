@@ -563,9 +563,9 @@ class Handler implements \SessionHandlerInterface
 
             // Save request data in session so if a lock is broken we can know which page it was for debugging
             if (empty($_SERVER['REQUEST_METHOD'])) {
-                $setData['req'] = $_SERVER['SCRIPT_NAME'];
+                $setData['req'] = @$_SERVER['SCRIPT_NAME'];
             } else {
-                $setData['req'] = "{$_SERVER['REQUEST_METHOD']} {$_SERVER['SERVER_NAME']}{$_SERVER['REQUEST_URI']}";
+                $setData['req'] = $_SERVER['REQUEST_METHOD']." ".@$_SERVER['SERVER_NAME'].@$_SERVER['REQUEST_URI'];
             }
             if ($lock != 1) {
                 $this->_log(
