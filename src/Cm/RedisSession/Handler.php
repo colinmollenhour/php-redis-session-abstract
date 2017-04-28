@@ -73,7 +73,7 @@ class Handler implements \SessionHandlerInterface
     /**
      * Bots get shorter session lifetimes
      */
-    const BOT_REGEX          = '/^alexa|^blitz\.io|bot|^browsermob|crawl|^curl|^facebookexternalhit|feed|google web preview|^ia_archiver|indexer|^java|jakarta|^libwww-perl|^load impact|^magespeedtest|monitor|^Mozilla$|nagios |^\.net|^pinterest|postrank|slurp|spider|uptime|^wget|yandex|^elb-healthchecker/i';
+    const BOT_REGEX          = '/^alexa|^blitz\.io|bot|^browsermob|crawl|^curl|^facebookexternalhit|feed|google web preview|^ia_archiver|indexer|^java|jakarta|^libwww-perl|^load impact|^magespeedtest|monitor|^Mozilla$|nagios |^\.net|^pinterest|postrank|slurp|spider|uptime|^wget|yandex|^elb-healthchecker|binglocalsearch/i';
 
     /**
      * Default connection timeout
