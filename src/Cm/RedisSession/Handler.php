@@ -545,7 +545,9 @@ class Handler implements \SessionHandlerInterface
 
         // Session can be read even if it was not locked by this pid!
         $timeStart2 = microtime(true);
-        list($sessionData, $sessionWrites) = $this->_redis->hMGet($sessionId, array('data','writes'));
+        $hash = $this->_redis->hMGet($sessionId, array('data','writes'));
+        $sessionData = $hash['data'];
+        $sessionWrites = $hash['writes'];
         $this->_log(sprintf("Data read for ID %s in %.5f seconds", $sessionId, (microtime(true) - $timeStart2)));
         $this->_sessionWrites = (int) $sessionWrites;
 

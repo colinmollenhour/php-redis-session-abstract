@@ -11,7 +11,7 @@
     ],
     "require":{
         "php": "~5.5.0|~5.6.0|~7.0.0|~7.1.0",
-        "colinmollenhour/credis":"~1.6"
+        "colinmollenhour/credis":"~1.9"
     },
     "autoload": {
         "psr-0": {
