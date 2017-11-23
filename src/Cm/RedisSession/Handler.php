@@ -703,15 +703,14 @@ class Handler implements \SessionHandlerInterface
             $lifeTime = null;
 
             // Detect bots by user agent
-            $botLifetime = $this->config->getBotLifetime() ?: self::DEFAULT_BOT_LIFETIME;
+            $botLifetime = is_null($this->config->getBotLifetime()) ? self::DEFAULT_BOT_LIFETIME : $this->config->getBotLifetime();
             if ($botLifetime) {
                 $userAgent = empty($_SERVER['HTTP_USER_AGENT']) ? false : $_SERVER['HTTP_USER_AGENT'];
                 $isBot = ! $userAgent || preg_match(self::BOT_REGEX, $userAgent);
                 if ($isBot) {
                     $this->_log(sprintf("Bot detected for user agent: %s", $userAgent));
-                    if ( $this->_sessionWrites <= 1
-                        && ($botFirstLifetime = $this->config->getBotFirstLifetime() ?: self::DEFAULT_BOT_FIRST_LIFETIME)
-                    ) {
+                    $botFirstLifetime = is_null($this->config->getBotFirstLifetime()) ? self::DEFAULT_BOT_FIRST_LIFETIME : $this->config->getBotFirstLifetime();
+                    if ($this->_sessionWrites <= 1 && $botFirstLifetime) {
                         $lifeTime = $botFirstLifetime * (1+$this->_sessionWrites);
                     } else {
                         $lifeTime = $botLifetime;
@@ -721,7 +720,7 @@ class Handler implements \SessionHandlerInterface
 
             // Use different lifetime for first write
             if ($lifeTime === null && $this->_sessionWrites <= 1) {
-                $firstLifetime = $this->config->getFirstLifetime() ?: self::DEFAULT_FIRST_LIFETIME;
+                $firstLifetime = is_null($this->config->getFirstLifetime()) ? self::DEFAULT_FIRST_LIFETIME : $this->config->getFirstLifetime();
                 if ($firstLifetime) {
                     $lifeTime = $firstLifetime * (1+$this->_sessionWrites);
                 }
