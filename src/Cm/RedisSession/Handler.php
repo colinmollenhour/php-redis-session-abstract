@@ -168,83 +168,83 @@ class Handler implements \SessionHandlerInterface
     /**
      * @var string
      */
-    private $_compressionThreshold;
+    protected $_compressionThreshold;
 
     /**
      * @var string
      */
-    private $_compressionLibrary;
+    protected $_compressionLibrary;
 
     /**
      * @var int
      */
-    private $_maxConcurrency;
+    protected $_maxConcurrency;
 
     /**
      * @var int
      */
-    private $_breakAfter;
+    protected $_breakAfter;
 
     /**
      * @var int
      */
-    private $_failAfter;
+    protected $_failAfter;
 
     /**
      * @var boolean
      */
-    private $_useLocking;
+    protected $_useLocking;
 
     /**
      * @var boolean
      */
-    private $_hasLock;
+    protected $_hasLock;
 
     /**
      * Avoid infinite loops
      *
      * @var boolean
      */
-    private $_sessionWritten;
+    protected $_sessionWritten;
 
     /**
      * Set expire time based on activity
      *
      * @var int
      */
-    private $_sessionWrites;
+    protected $_sessionWrites;
 
     /**
      * @var int
      */
-    private $_maxLifetime;
+    protected $_maxLifetime;
 
     /**
      * @var int
      */
-    private $_minLifetime;
+    protected $_minLifetime;
 
     /**
      * For debug or informational purposes
      *
      * @var int
      */
-    private $failedLockAttempts = 0;
+    protected $failedLockAttempts = 0;
 
     /**
      * @var ConfigInterface
      */
-    private $config;
+    protected $config;
 
     /**
      * @var LoggerInterface
      */
-    private $logger;
+    protected $logger;
 
     /**
      * @var int
      */
-    private $_lifeTime;
+    protected $_lifeTime;
 
     /**
      * @param ConfigInterface $config
@@ -368,7 +368,7 @@ class Handler implements \SessionHandlerInterface
      * @param $msg
      * @param $level
      */
-    private function _log($msg, $level = LoggerInterface::DEBUG)
+    protected function _log($msg, $level = LoggerInterface::DEBUG)
     {
         $this->logger->log("{$this->_getPid()}: $msg", $level);
     }
@@ -697,7 +697,7 @@ class Handler implements \SessionHandlerInterface
      *
      * @return int|mixed
      */
-    private function getLifeTime()
+    protected function getLifeTime()
     {
         if (is_null($this->_lifeTime)) {
             $lifeTime = null;
@@ -825,7 +825,7 @@ class Handler implements \SessionHandlerInterface
      *
      * @return string
      */
-    private function _getPid()
+    protected function _getPid()
     {
         return gethostname().'|'.getmypid();
     }
@@ -836,7 +836,7 @@ class Handler implements \SessionHandlerInterface
      * @param $pid
      * @return bool
      */
-    private function _pidExists($pid)
+    protected function _pidExists($pid)
     {
         list($host,$pid) = explode('|', $pid);
         if (PHP_OS != 'Linux' || $host != gethostname()) {
@@ -850,7 +850,7 @@ class Handler implements \SessionHandlerInterface
      *
      * @return int
      */
-    private function _getBreakAfter()
+    protected function _getBreakAfter()
     {
         // Has break after already been calculated? Only fetch from config once, then reuse variable.
         if (!$this->_breakAfter) {
