@@ -816,7 +816,7 @@ class Handler implements \SessionHandlerInterface
                 'lock' => 0, // 0 so that next lock attempt will get 1
             ))
             ->hIncrBy($sessionId, 'writes', 1)
-            ->expire($sessionId, min($lifetime, $this->_maxLifetime))
+            ->expire($sessionId, min((int)$lifetime, (int)$this->_maxLifetime))
             ->exec();
     }
 
