@@ -570,8 +570,8 @@ class Handler implements \SessionHandlerInterface
             if ($lock != 1) {
                 $this->_log(
                     sprintf(
-                        "Successfully broke lock for ID %s after %.5f seconds (%d attempts). Lock: %d\nLast request of '
-                            . 'broken lock: %s",
+                        "Successfully broke lock for ID %s after %.5f seconds (%d attempts). Lock: %d\nLast request of "
+                            . "broken lock: %s",
                         $sessionId,
                         (microtime(true) - $timeStart),
                         $tries,
