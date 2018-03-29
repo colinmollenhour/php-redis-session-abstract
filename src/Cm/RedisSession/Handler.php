@@ -247,11 +247,17 @@ class Handler implements \SessionHandlerInterface
     protected $_lifeTime;
 
     /**
+     * @var boolean
+     */
+    private $_readOnly;
+
+    /**
      * @param ConfigInterface $config
      * @param LoggerInterface $logger
+     * @param boolean $readOnly
      * @throws ConnectionFailedException
      */
-    public function __construct(ConfigInterface $config, LoggerInterface $logger)
+    public function __construct(ConfigInterface $config, LoggerInterface $logger, $readOnly = false)
     {
         $this->config = $config;
         $this->logger = $logger;
@@ -268,6 +274,7 @@ class Handler implements \SessionHandlerInterface
         $this->_dbNum =     $this->config->getDatabase() ?: self::DEFAULT_DATABASE;
 
         // General config
+        $this->_readOnly =              $readOnly;
         $this->_compressionThreshold =  $this->config->getCompressionThreshold() ?: self::DEFAULT_COMPRESSION_THRESHOLD;
         $this->_compressionLibrary =    $this->config->getCompressionLibrary() ?: self::DEFAULT_COMPRESSION_LIBRARY;
         $this->_maxConcurrency =        $this->config->getMaxConcurrency() ?: self::DEFAULT_MAX_CONCURRENCY;
@@ -410,7 +417,7 @@ class Handler implements \SessionHandlerInterface
         $this->_log(sprintf("Attempting to take lock on ID %s", $sessionId));
 
         $this->_redis->select($this->_dbNum);
-        while ($this->_useLocking)
+        while ($this->_useLocking && !$this->_readOnly)
         {
             // Increment lock value for this session and retrieve the new value
             $oldLock = $lock;
@@ -606,8 +613,8 @@ class Handler implements \SessionHandlerInterface
      */
     public function write($sessionId, $sessionData)
     {
-        if ($this->_sessionWritten) {
-            $this->_log(sprintf("Repeated session write detected; skipping for ID %s", $sessionId));
+        if ($this->_sessionWritten || $this->_readOnly) {
+            $this->_log(sprintf(($this->_sessionWritten ? "Repeated" : "Read-only") . " session write detected; skipping for ID %s", $sessionId));
             return true;
         }
         $this->_sessionWritten = true;
