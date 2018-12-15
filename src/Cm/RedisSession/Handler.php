@@ -246,6 +246,9 @@ class Handler implements \SessionHandlerInterface
      */
     protected $_lifeTime;
 
+    /** @var null|array Callback method to call. It will receive 2 parameters: $userAgent, $isBot */
+    static public $_botCheckCallback = null;
+
     /**
      * @var boolean
      */
@@ -703,17 +706,9 @@ class Handler implements \SessionHandlerInterface
     {
         $isBot = !$userAgent || preg_match(self::BOT_REGEX, $userAgent);
 
-        $dataObject = new \Varien_Object();
-        $dataObject->setData('is_bot', $isBot);
-        $dataObject->setData('user_agent', $userAgent);
-
-        // Allow other modules to check the user agent and change the "is bot" result if desired
-        \Mage::dispatchEvent(
-            'cm_redissession_handler_is_bot_agent',
-            array('data_object' => $dataObject)
-        );
-
-        $isBot = $dataObject->getData('is_bot');
+        if (is_array(self::$_botCheckCallback) && isset(self::$_botCheckCallback[0]) && self::$_botCheckCallback[1] && method_exists(self::$_botCheckCallback[0], self::$_botCheckCallback[1])) {
+            $isBot = (bool) call_user_func_array(self::$_botCheckCallback, [$userAgent, $isBot]);
+        }
 
         return $isBot;
     }
