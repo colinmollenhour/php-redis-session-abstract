@@ -699,6 +699,25 @@ class Handler implements \SessionHandlerInterface
         return $this->failedLockAttempts;
     }
 
+    static public function isBotAgent($userAgent)
+    {
+        $isBot = !$userAgent || preg_match(self::BOT_REGEX, $userAgent);
+
+        $dataObject = new \Varien_Object();
+        $dataObject->setData('is_bot', $isBot);
+        $dataObject->setData('user_agent', $userAgent);
+
+        // Allow other modules to check the user agent and change the "is bot" result if desired
+        \Mage::dispatchEvent(
+            'cm_redissession_handler_is_bot_agent',
+            array('data_object' => $dataObject)
+        );
+
+        $isBot = $dataObject->getData('is_bot');
+
+        return $isBot;
+    }
+
     /**
      * Get lock lifetime
      *
@@ -713,8 +732,7 @@ class Handler implements \SessionHandlerInterface
             $botLifetime = is_null($this->config->getBotLifetime()) ? self::DEFAULT_BOT_LIFETIME : $this->config->getBotLifetime();
             if ($botLifetime) {
                 $userAgent = empty($_SERVER['HTTP_USER_AGENT']) ? false : $_SERVER['HTTP_USER_AGENT'];
-                $isBot = ! $userAgent || preg_match(self::BOT_REGEX, $userAgent);
-                if ($isBot) {
+                if (self::isBotAgent($userAgent)) {
                     $this->_log(sprintf("Bot detected for user agent: %s", $userAgent));
                     $botFirstLifetime = is_null($this->config->getBotFirstLifetime()) ? self::DEFAULT_BOT_FIRST_LIFETIME : $this->config->getBotFirstLifetime();
                     if ($this->_sessionWrites <= 1 && $botFirstLifetime) {
