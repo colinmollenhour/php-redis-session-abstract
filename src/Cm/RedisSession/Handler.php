@@ -246,6 +246,9 @@ class Handler implements \SessionHandlerInterface
      */
     protected $_lifeTime;
 
+    /** @var null|array Callback method to call. It will receive 2 parameters: $userAgent, $isBot */
+    static public $_botCheckCallback = null;
+
     /**
      * @var boolean
      */
@@ -699,6 +702,17 @@ class Handler implements \SessionHandlerInterface
         return $this->failedLockAttempts;
     }
 
+    static public function isBotAgent($userAgent)
+    {
+        $isBot = !$userAgent || preg_match(self::BOT_REGEX, $userAgent);
+
+        if (is_array(self::$_botCheckCallback) && isset(self::$_botCheckCallback[0]) && self::$_botCheckCallback[1] && method_exists(self::$_botCheckCallback[0], self::$_botCheckCallback[1])) {
+            $isBot = (bool) call_user_func_array(self::$_botCheckCallback, [$userAgent, $isBot]);
+        }
+
+        return $isBot;
+    }
+
     /**
      * Get lock lifetime
      *
@@ -713,8 +727,7 @@ class Handler implements \SessionHandlerInterface
             $botLifetime = is_null($this->config->getBotLifetime()) ? self::DEFAULT_BOT_LIFETIME : $this->config->getBotLifetime();
             if ($botLifetime) {
                 $userAgent = empty($_SERVER['HTTP_USER_AGENT']) ? false : $_SERVER['HTTP_USER_AGENT'];
-                $isBot = ! $userAgent || preg_match(self::BOT_REGEX, $userAgent);
-                if ($isBot) {
+                if (self::isBotAgent($userAgent)) {
                     $this->_log(sprintf("Bot detected for user agent: %s", $userAgent));
                     $botFirstLifetime = is_null($this->config->getBotFirstLifetime()) ? self::DEFAULT_BOT_FIRST_LIFETIME : $this->config->getBotFirstLifetime();
                     if ($this->_sessionWrites <= 1 && $botFirstLifetime) {
