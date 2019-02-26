@@ -284,7 +284,7 @@ class Handler implements \SessionHandlerInterface
         $this->_failAfter =             $this->config->getFailAfter() ?: self::DEFAULT_FAIL_AFTER;
         $this->_maxLifetime =           $this->config->getMaxLifetime() ?: self::DEFAULT_MAX_LIFETIME;
         $this->_minLifetime =           $this->config->getMinLifetime() ?: self::DEFAULT_MIN_LIFETIME;
-        $this->_useLocking =            ! $this->config->getDisableLocking();
+        $this->_useLocking =            $this->getUseLocking();
 
         // Use sleep time multiplier so fail after time is in seconds
         $this->_failAfter = (int) round((1000000 / self::SLEEP_TIME) * $this->_failAfter);
@@ -726,7 +726,7 @@ class Handler implements \SessionHandlerInterface
             // Detect bots by user agent
             $botLifetime = is_null($this->config->getBotLifetime()) ? self::DEFAULT_BOT_LIFETIME : $this->config->getBotLifetime();
             if ($botLifetime) {
-                $userAgent = empty($_SERVER['HTTP_USER_AGENT']) ? false : $_SERVER['HTTP_USER_AGENT'];
+                $userAgent = $this->getUserAgent();
                 if (self::isBotAgent($userAgent)) {
                     $this->_log(sprintf("Bot detected for user agent: %s", $userAgent));
                     $botFirstLifetime = is_null($this->config->getBotFirstLifetime()) ? self::DEFAULT_BOT_FIRST_LIFETIME : $this->config->getBotFirstLifetime();
@@ -881,5 +881,25 @@ class Handler implements \SessionHandlerInterface
         }
 
         return $this->_breakAfter;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function getUseLocking()
+    {
+        $userAgent = $this->getUserAgent();
+        if (self::isBotAgent($userAgent)) {
+            return ! $this->config->getBotDisableLocking();
+        }
+        return ! $this->config->getDisableLocking();
+    }
+
+    /**
+     * @return string|bool
+     */
+    protected function getUserAgent()
+    {
+        return empty($_SERVER['HTTP_USER_AGENT']) ? false : $_SERVER['HTTP_USER_AGENT'];
     }
 }

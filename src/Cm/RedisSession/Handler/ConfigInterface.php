@@ -131,6 +131,13 @@ interface ConfigInterface
     public function getDisableLocking();
 
     /**
+     * Disable session locking for bots only
+     *
+     * @return bool
+     */
+    public function getBotDisableLocking();
+
+    /**
      * Get lifetime of session for bots on subsequent writes, 0 to disable
      *
      * @return int
