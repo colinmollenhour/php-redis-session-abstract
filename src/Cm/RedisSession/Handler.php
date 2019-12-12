@@ -69,11 +69,6 @@ class Handler implements \SessionHandlerInterface
      * Session prefix
      */
     const SESSION_PREFIX     = 'sess_';
-   
-    /**
-     * Additional Session prefix
-     */
-    const SESSION_PREFIX_ADDITIONAL     = '';
 
     /**
      * Bots get shorter session lifetimes
@@ -296,7 +291,7 @@ class Handler implements \SessionHandlerInterface
         $this->_failAfter =             $this->config->getFailAfter() ?: self::DEFAULT_FAIL_AFTER;
         $this->_maxLifetime =           $this->config->getMaxLifetime() ?: self::DEFAULT_MAX_LIFETIME;
         $this->_minLifetime =           $this->config->getMinLifetime() ?: self::DEFAULT_MIN_LIFETIME;
-        $this->_prefixAdditional =      $this->config->getPrefix() ?: self::SESSION_PREFIX_ADDITIONAL;
+        $this->_prefixAdditional =      $this->config->getPrefix() ?: '';
         $this->_useLocking =            ! $this->config->getDisableLocking();
 
         // Use sleep time multiplier so fail after time is in seconds
@@ -424,7 +419,7 @@ class Handler implements \SessionHandlerInterface
     public function read($sessionId)
     {
         // Get lock on session. Increment the "lock" field and if the new value is 1, we have the lock.
-        $sessionId = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
+        $sessionId = 'sess_'.$this->_prefixAdditional.$sessionId;
         $tries = $waiting = $lock = 0;
         $lockPid = $oldLockPid = null; // Restart waiting for lock when current lock holder changes
         $detectZombies = false;
@@ -629,7 +624,7 @@ class Handler implements \SessionHandlerInterface
      */
     public function write($sessionId, $sessionData)
     {
-        $sessionId = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
+        $sessionId = 'sess_'.$this->_prefixAdditional.$sessionId;
        
         if ($this->_sessionWritten || $this->_readOnly) {
             $this->_log(sprintf(($this->_sessionWritten ? "Repeated" : "Read-only") . " session write detected; skipping for ID %s", $sessionId));
@@ -677,11 +672,11 @@ class Handler implements \SessionHandlerInterface
     public function destroy($sessionId)
     {
         
-        $sessionId = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
+        $sessionId = 'sess_'.$this->_prefixAdditional.$sessionId;
         $this->_log(sprintf("Destroying ID %s", $sessionId));
         $this->_redis->pipeline();
         if($this->_dbNum) $this->_redis->select($this->_dbNum);
-        $this->_redis->del(self::SESSION_PREFIX.$sessionId);
+        $this->_redis->del('sess_'.$sessionId);
         $this->_redis->exec();
         return true;
     }
@@ -845,7 +840,7 @@ class Handler implements \SessionHandlerInterface
      */
     protected function _writeRawSession($id, $data, $lifetime)
     {
-        $sessionId = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
+        $sessionId = 'sess_'.$this->_prefixAdditional.$sessionId;
         $this->_redis->pipeline()
             ->select($this->_dbNum)
             ->hMSet($sessionId, array(
