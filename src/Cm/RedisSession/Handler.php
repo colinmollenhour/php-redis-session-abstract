@@ -676,7 +676,7 @@ class Handler implements \SessionHandlerInterface
         $this->_log(sprintf("Destroying ID %s", $sessionId));
         $this->_redis->pipeline();
         if($this->_dbNum) $this->_redis->select($this->_dbNum);
-        $this->_redis->del('sess_'.$sessionId);
+        $this->_redis->del($sessionId);
         $this->_redis->exec();
         return true;
     }
@@ -840,15 +840,14 @@ class Handler implements \SessionHandlerInterface
      */
     protected function _writeRawSession($id, $data, $lifetime)
     {
-        $sessionId = 'sess_'.$this->_prefixAdditional.$sessionId;
         $this->_redis->pipeline()
             ->select($this->_dbNum)
-            ->hMSet($sessionId, array(
+            ->hMSet($id, array(
                 'data' => $this->_encodeData($data),
                 'lock' => 0, // 0 so that next lock attempt will get 1
             ))
-            ->hIncrBy($sessionId, 'writes', 1)
-            ->expire($sessionId, min((int)$lifetime, (int)$this->_maxLifetime))
+            ->hIncrBy($id, 'writes', 1)
+            ->expire($id, min((int)$lifetime, (int)$this->_maxLifetime))
             ->exec();
     }
 
