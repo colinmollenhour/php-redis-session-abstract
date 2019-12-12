@@ -677,7 +677,7 @@ class Handler implements \SessionHandlerInterface
     public function destroy($sessionId)
     {
         
-       = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
+        $sessionId = self::SESSION_PREFIX.$this->_prefixAdditional.$sessionId;
         $this->_log(sprintf("Destroying ID %s", $sessionId));
         $this->_redis->pipeline();
         if($this->_dbNum) $this->_redis->select($this->_dbNum);
