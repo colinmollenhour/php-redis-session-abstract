@@ -306,6 +306,8 @@ class Handler implements \SessionHandlerInterface
                     $sentinelClient = new \Credis_Client($server, NULL, $timeout, $persistent);
                     $sentinelClient->forceStandalone();
                     $sentinelClient->setMaxConnectRetries(0);
+                    if ($pass) $sentinelClient->auth($pass);
+                   
                     $sentinel = new \Credis_Sentinel($sentinelClient);
                     $sentinel
                         ->setClientTimeout($timeout)
