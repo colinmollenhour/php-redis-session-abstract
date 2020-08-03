@@ -303,7 +303,7 @@ class Handler implements \SessionHandlerInterface
             for ($i = 0; $i <= $sentinelConnectRetries; $i++) // Try to connect to sentinels in round-robin fashion
             foreach ($servers as $server) {
                 try {
-                    $sentinelClient = new \Credis_Client($server, NULL, $timeout, $persistent);
+                    $sentinelClient = new \Credis_Client($server, $port, $timeout, $persistent);
                     $sentinelClient->forceStandalone();
                     $sentinelClient->setMaxConnectRetries(0);
                     if ($pass) $sentinelClient->auth($pass);
@@ -332,7 +332,7 @@ class Handler implements \SessionHandlerInterface
 
                     $this->_redis = $redisMaster;
                     break 2;
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     unset($sentinelClient);
                     $exception = $e;
                 }
