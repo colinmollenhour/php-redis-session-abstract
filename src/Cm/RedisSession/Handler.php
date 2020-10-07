@@ -306,7 +306,16 @@ class Handler implements \SessionHandlerInterface
                     $sentinelClient = new \Credis_Client($server, NULL, $timeout, $persistent);
                     $sentinelClient->forceStandalone();
                     $sentinelClient->setMaxConnectRetries(0);
-                    if ($pass) $sentinelClient->auth($pass);
+                    if ($pass) {
+                        try {
+                            $sentinelClient->auth($pass);
+                        } catch (\CredisException $e) {
+                            // Prevent throwing exception if Sentinel has no password set
+                            if($e->getCode() !== 0 || strpos($e->getMessage(),'ERR Client sent AUTH, but no password is set') === false) {
+                                throw $e;
+                            }
+                        }
+                    }
                    
                     $sentinel = new \Credis_Sentinel($sentinelClient);
                     $sentinel
