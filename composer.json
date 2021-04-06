@@ -10,8 +10,11 @@
         }
     ],
     "require":{
-        "php": "^5.5 || ^7.0",
+        "php": "^5.5 || ^7.0 || ^8.0",
         "colinmollenhour/credis":"~1.6"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9"
     },
     "autoload": {
         "psr-0": {
