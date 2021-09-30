@@ -56,9 +56,9 @@ use Cm\RedisSession\Handler\LoggerInterface;
 class Handler implements \SessionHandlerInterface
 {
     /**
-     * Sleep 0.5 seconds between lock attempts (1,000,000 == 1 second)
+     * Sleep 5 milliseconds between lock attempts (1,000,000 == 1 second)
      */
-    const SLEEP_TIME         = 500000;
+    const SLEEP_TIME         = 5000;
 
     /**
      * Try to detect zombies every this many tries
