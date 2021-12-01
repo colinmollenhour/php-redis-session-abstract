@@ -380,6 +380,7 @@ class Handler implements \SessionHandlerInterface
      * @return bool
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
+    #[\ReturnTypeWillChange]
     public function open($savePath, $sessionName)
     {
         return true;
@@ -419,6 +420,7 @@ class Handler implements \SessionHandlerInterface
      * @return string
      * @throws ConcurrentConnectionsExceededException
      */
+    #[\ReturnTypeWillChange]
     public function read($sessionId)
     {
         // Get lock on session. Increment the "lock" field and if the new value is 1, we have the lock.
@@ -625,6 +627,7 @@ class Handler implements \SessionHandlerInterface
      * @param string $sessionData
      * @return boolean
      */
+    #[\ReturnTypeWillChange]
     public function write($sessionId, $sessionData)
     {
         if ($this->_sessionWritten || $this->_readOnly) {
@@ -670,6 +673,7 @@ class Handler implements \SessionHandlerInterface
      * @param string $sessionId
      * @return boolean
      */
+    #[\ReturnTypeWillChange]
     public function destroy($sessionId)
     {
         $this->_log(sprintf("Destroying ID %s", $sessionId));
@@ -685,6 +689,7 @@ class Handler implements \SessionHandlerInterface
      *
      * @return bool
      */
+    #[\ReturnTypeWillChange]
     public function close()
     {
         $this->_log("Closing connection");
@@ -698,6 +703,7 @@ class Handler implements \SessionHandlerInterface
      * @param int $maxLifeTime ignored
      * @return boolean
      */
+    #[\ReturnTypeWillChange]
     public function gc($maxLifeTime)
     {
         return true;
