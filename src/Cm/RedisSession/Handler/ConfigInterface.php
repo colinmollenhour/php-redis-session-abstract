@@ -192,4 +192,14 @@ interface ConfigInterface
      * @return string
      */
     public function getSentinelConnectRetries();
+   
+   
+    /**
+     * Get configurable prefix for session ID
+     *
+     * @return string
+     */
+    public function getPrefix();
+   
+   
 }
