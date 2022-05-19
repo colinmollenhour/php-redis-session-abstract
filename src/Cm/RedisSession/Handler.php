@@ -297,7 +297,7 @@ class Handler implements \SessionHandlerInterface
 
         // Connect and authenticate
         if ($sentinelServers && $sentinelMaster) {
-            $servers = preg_split('/\s*,\s*/', trim($sentinelServers), NULL, PREG_SPLIT_NO_EMPTY);
+            $servers = preg_split('/\s*,\s*/', trim($sentinelServers), -1, PREG_SPLIT_NO_EMPTY);
             $sentinel = NULL;
             $exception = NULL;
             for ($i = 0; $i <= $sentinelConnectRetries; $i++) // Try to connect to sentinels in round-robin fashion
