@@ -310,8 +310,11 @@ class Handler implements \SessionHandlerInterface
                         try {
                             $sentinelClient->auth($pass);
                         } catch (\CredisException $e) {
-                            // Prevent throwing exception if Sentinel has no password set
-                            if($e->getCode() !== 0 || strpos($e->getMessage(),'ERR Client sent AUTH, but no password is set') === false) {
+                            // Prevent throwing exception if Sentinel has no password set (error messages are different between redis 5 and redis 6)
+                            if ($e->getCode() !== 0 || (
+                                strpos($e->getMessage(), 'ERR Client sent AUTH, but no password is set') === false && 
+                                strpos($e->getMessage(), 'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?') === false)
+                            ) {
                                 throw $e;
                             }
                         }
