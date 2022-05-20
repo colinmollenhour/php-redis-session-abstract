@@ -349,7 +349,7 @@ class Handler implements \SessionHandlerInterface
             unset($sentinel);
 
             if ( ! $this->_redis) {
-                throw new ConnectionFailedException('Unable to connect to a Redis: '.$exception->getMessage(), $exception);
+                throw new ConnectionFailedException('Unable to connect to a Redis: '.$exception->getMessage(), 0, $exception);
             }
         }
         else {
