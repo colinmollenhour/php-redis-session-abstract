@@ -333,7 +333,7 @@ class Handler implements \SessionHandlerInterface
                             if ($pass) $redisMaster->auth($pass);
                             $roleData = $redisMaster->role();
                             if ( ! $roleData || $roleData[0] != 'master') {
-                                throw new Exception('Unable to determine master redis server.');
+                                throw new \Exception('Unable to determine master redis server.');
                             }
                         }
                     }
@@ -341,7 +341,7 @@ class Handler implements \SessionHandlerInterface
 
                     $this->_redis = $redisMaster;
                     break 2;
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     unset($sentinelClient);
                     $exception = $e;
                 }
