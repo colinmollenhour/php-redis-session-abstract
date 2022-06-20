@@ -297,7 +297,7 @@ class Handler implements \SessionHandlerInterface
 
         // Connect and authenticate
         if ($sentinelServers && $sentinelMaster) {
-            $servers = preg_split('/\s*,\s*/', trim($sentinelServers), NULL, PREG_SPLIT_NO_EMPTY);
+            $servers = preg_split('/\s*,\s*/', trim($sentinelServers), -1, PREG_SPLIT_NO_EMPTY);
             $sentinel = NULL;
             $exception = NULL;
             for ($i = 0; $i <= $sentinelConnectRetries; $i++) // Try to connect to sentinels in round-robin fashion
@@ -310,8 +310,11 @@ class Handler implements \SessionHandlerInterface
                         try {
                             $sentinelClient->auth($pass);
                         } catch (\CredisException $e) {
-                            // Prevent throwing exception if Sentinel has no password set
-                            if($e->getCode() !== 0 || strpos($e->getMessage(),'ERR Client sent AUTH, but no password is set') === false) {
+                            // Prevent throwing exception if Sentinel has no password set (error messages are different between redis 5 and redis 6)
+                            if ($e->getCode() !== 0 || (
+                                strpos($e->getMessage(), 'ERR Client sent AUTH, but no password is set') === false && 
+                                strpos($e->getMessage(), 'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?') === false)
+                            ) {
                                 throw $e;
                             }
                         }
@@ -333,7 +336,7 @@ class Handler implements \SessionHandlerInterface
                             if ($pass) $redisMaster->auth($pass);
                             $roleData = $redisMaster->role();
                             if ( ! $roleData || $roleData[0] != 'master') {
-                                throw new Exception('Unable to determine master redis server.');
+                                throw new \Exception('Unable to determine master redis server.');
                             }
                         }
                     }
@@ -341,7 +344,7 @@ class Handler implements \SessionHandlerInterface
 
                     $this->_redis = $redisMaster;
                     break 2;
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     unset($sentinelClient);
                     $exception = $e;
                 }
@@ -349,7 +352,7 @@ class Handler implements \SessionHandlerInterface
             unset($sentinel);
 
             if ( ! $this->_redis) {
-                throw new ConnectionFailedException('Unable to connect to a Redis: '.$exception->getMessage(), $exception);
+                throw new ConnectionFailedException('Unable to connect to a Redis: '.$exception->getMessage(), 0, $exception);
             }
         }
         else {
