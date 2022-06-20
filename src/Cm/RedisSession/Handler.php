@@ -682,7 +682,7 @@ class Handler implements \SessionHandlerInterface
         $this->_log(sprintf("Destroying ID %s", $sessionId));
         $this->_redis->pipeline();
         if($this->_dbNum) $this->_redis->select($this->_dbNum);
-        $this->_redis->del(self::SESSION_PREFIX.$sessionId);
+        $this->_redis->unlink(self::SESSION_PREFIX.$sessionId);
         $this->_redis->exec();
         return true;
     }
