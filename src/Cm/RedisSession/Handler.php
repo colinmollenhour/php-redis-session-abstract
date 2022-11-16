@@ -417,6 +417,19 @@ class Handler implements \SessionHandlerInterface
     }
 
     /**
+     * Set/unset read only flag
+     *
+     * @param boolean $readOnly
+     * @return self
+     */
+    public function setReadOnly($readOnly)
+    {
+        $this->_readOnly = $readOnly;
+
+        return $this;
+    }
+
+    /**
      * Fetch session data
      *
      * @param string $sessionId
