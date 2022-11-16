@@ -255,6 +255,11 @@ class Handler implements \SessionHandlerInterface
     private $_readOnly;
 
     /**
+     * @var array
+     */
+    private $_lastReadSessionDataById = [];
+
+    /**
      * @param ConfigInterface $config
      * @param LoggerInterface $logger
      * @param boolean $readOnly
@@ -262,6 +267,12 @@ class Handler implements \SessionHandlerInterface
      */
     public function __construct(ConfigInterface $config, LoggerInterface $logger, $readOnly = false)
     {
+        // we must be able to manipulate session data easily using native serialize/unserialize functions
+        // and as long as the default php session serializer doesn't handle object references correctly, we have no choice forcing this option
+        if (ini_get('session.serialize_handler') !== 'php_serialize') {
+            throw new \Exception('You must set session.serialize_handler ini config to "php_serialize" value');
+        }
+
         $this->config = $config;
         $this->logger = $logger;
 
@@ -417,14 +428,14 @@ class Handler implements \SessionHandlerInterface
     }
 
     /**
-     * Fetch session data
+     * Acquire lock
      *
      * @param string $sessionId
      * @return string
      * @throws ConcurrentConnectionsExceededException
      */
     #[\ReturnTypeWillChange]
-    public function read($sessionId)
+    protected function _lock($sessionId)
     {
         // Get lock on session. Increment the "lock" field and if the new value is 1, we have the lock.
         $sessionId = self::SESSION_PREFIX.$sessionId;
@@ -436,7 +447,7 @@ class Handler implements \SessionHandlerInterface
         $this->_log(sprintf("Attempting to take lock on ID %s", $sessionId));
 
         $this->_redis->select($this->_dbNum);
-        while ($this->_useLocking && !$this->_readOnly)
+        while (!$this->_readOnly)
         {
             // Increment lock value for this session and retrieve the new value
             $oldLock = $lock;
@@ -455,56 +466,96 @@ class Handler implements \SessionHandlerInterface
                 )
             ) {
                 $this->_hasLock = true;
-                break;
-            }
 
-            // Otherwise, add to "wait" counter and continue
-            else if ( ! $waiting) {
-                $i = 0;
-                do {
-                    $waiting = $this->_redis->hIncrBy($sessionId, 'wait', 1);
-                } while (++$i < $this->_maxConcurrency && $waiting < 1);
-            }
+                $setData = array(
+                    'pid' => $this->_getPid(),
+                    'lock' => 1,
+                );
 
-            // Handle overloaded sessions
-            else {
-                // Detect broken sessions (e.g. caused by fatal errors)
-                if ($detectZombies) {
-                    $detectZombies = false;
-                    // Lock shouldn't be less than old lock (another process broke the lock)
-                    if ($lock > $oldLock
-                        // Lock should be old+waiting, otherwise there must be a dead process
-                        && $lock + 1 < $oldLock + $waiting
-                    ) {
-                        // Reset session to fresh state
-                        $this->_log(
-                            sprintf(
-                                "Detected zombie waiter after %.5f seconds for ID %s (%d waiting)",
-                                (microtime(true) - $timeStart),
-                                $sessionId, $waiting
-                            ),
-                            LoggerInterface::INFO
-                        );
-                        $waiting = $this->_redis->hIncrBy($sessionId, 'wait', -1);
-                        continue;
-                    }
+                // Save request data in session so if a lock is broken we can know which page it was for debugging
+                if (empty($_SERVER['REQUEST_METHOD'])) {
+                    $setData['req'] = @$_SERVER['SCRIPT_NAME'];
+                } else {
+                    $setData['req'] = $_SERVER['REQUEST_METHOD']." ".@$_SERVER['SERVER_NAME'].@$_SERVER['REQUEST_URI'];
                 }
-
-                // Limit concurrent lock waiters to prevent server resource hogging
-                if ($waiting >= $this->_maxConcurrency) {
-                    // Overloaded sessions get 503 errors
-                    $this->_redis->hIncrBy($sessionId, 'wait', -1);
-                    $this->_sessionWritten = true; // Prevent session from getting written
-                    $writes = $this->_redis->hGet($sessionId, 'writes');
+                if ($lock != 1) {
                     $this->_log(
                         sprintf(
-                            'Session concurrency exceeded for ID %s; displaying HTTP 503 (%s waiting, %s total '
-                            . 'requests)',
-                            $sessionId, $waiting, $writes
+                            "Successfully broke lock for ID %s after %.5f seconds (%d attempts). Lock: %d\nLast request of "
+                            . "broken lock: %s",
+                            $sessionId,
+                            (microtime(true) - $timeStart),
+                            $tries,
+                            $lock,
+                            $this->_redis->hGet($sessionId, 'req')
                         ),
-                        LoggerInterface::WARNING
+                        LoggerInterface::INFO
                     );
-                    throw new ConcurrentConnectionsExceededException();
+                }
+
+                // Set session data and expiration
+                $this->_redis->pipeline();
+                if ( ! empty($setData)) {
+                    $this->_redis->hMSet($sessionId, $setData);
+                }
+                $this->_redis->expire($sessionId, 3600*6); // Expiration will be set to correct value when session is written
+
+                // This process is no longer waiting for a lock
+                if ($tries > 0) {
+                    $this->_redis->hIncrBy($sessionId, 'wait', -1);
+                }
+                $this->_redis->exec();
+
+                break;
+            } // Otherwise, add to "wait" counter and continue
+            else {
+                if ( ! $waiting) {
+                    $i = 0;
+                    do {
+                        $waiting = $this->_redis->hIncrBy($sessionId, 'wait', 1);
+                    } while (++$i < $this->_maxConcurrency && $waiting < 1);
+                }
+
+                // Handle overloaded sessions
+                else {
+                    // Detect broken sessions (e.g. caused by fatal errors)
+                    if ($detectZombies) {
+                        $detectZombies = false;
+                        // Lock shouldn't be less than old lock (another process broke the lock)
+                        if ($lock > $oldLock
+                            // Lock should be old+waiting, otherwise there must be a dead process
+                            && $lock + 1 < $oldLock + $waiting
+                        ) {
+                            // Reset session to fresh state
+                            $this->_log(
+                                sprintf(
+                                    "Detected zombie waiter after %.5f seconds for ID %s (%d waiting)",
+                                    (microtime(true) - $timeStart),
+                                    $sessionId, $waiting
+                                ),
+                                LoggerInterface::INFO
+                            );
+                            $waiting = $this->_redis->hIncrBy($sessionId, 'wait', -1);
+                            continue;
+                        }
+                    }
+
+                    // Limit concurrent lock waiters to prevent server resource hogging
+                    if ($waiting >= $this->_maxConcurrency) {
+                        // Overloaded sessions get 503 errors
+                        $this->_redis->hIncrBy($sessionId, 'wait', -1);
+                        $this->_sessionWritten = true; // Prevent session from getting written
+                        $writes = $this->_redis->hGet($sessionId, 'writes');
+                        $this->_log(
+                            sprintf(
+                                'Session concurrency exceeded for ID %s; displaying HTTP 503 (%s waiting, %s total '
+                                . 'requests)',
+                                $sessionId, $waiting, $writes
+                            ),
+                            LoggerInterface::WARNING
+                        );
+                        throw new ConcurrentConnectionsExceededException();
+                    }
                 }
             }
 
@@ -568,59 +619,33 @@ class Handler implements \SessionHandlerInterface
             }
         }
         $this->failedLockAttempts = $tries;
+    }
 
-        // Session can be read even if it was not locked by this pid!
+    /**
+     * Fetch session data
+     *
+     * @param string $sessionId
+     * @return string
+     * @throws ConcurrentConnectionsExceededException
+     */
+    #[\ReturnTypeWillChange]
+    public function read($sessionId)
+    {
+        $sessionId = self::SESSION_PREFIX . $sessionId;
+
         $timeStart2 = microtime(true);
+        $this->_redis->select($this->_dbNum);
         list($sessionData, $sessionWrites) = array_values($this->_redis->hMGet($sessionId, array('data','writes')));
         $this->_log(sprintf("Data read for ID %s in %.5f seconds", $sessionId, (microtime(true) - $timeStart2)));
         $this->_sessionWrites = (int) $sessionWrites;
 
-        // This process is no longer waiting for a lock
-        if ($tries > 0) {
-            $this->_redis->hIncrBy($sessionId, 'wait', -1);
-        }
-
-        // This process has the lock, save the pid
-        if ($this->_hasLock) {
-            $setData = array(
-                'pid' => $this->_getPid(),
-                'lock' => 1,
-            );
-
-            // Save request data in session so if a lock is broken we can know which page it was for debugging
-            if (empty($_SERVER['REQUEST_METHOD'])) {
-                $setData['req'] = @$_SERVER['SCRIPT_NAME'];
-            } else {
-                $setData['req'] = $_SERVER['REQUEST_METHOD']." ".@$_SERVER['SERVER_NAME'].@$_SERVER['REQUEST_URI'];
-            }
-            if ($lock != 1) {
-                $this->_log(
-                    sprintf(
-                        "Successfully broke lock for ID %s after %.5f seconds (%d attempts). Lock: %d\nLast request of "
-                            . "broken lock: %s",
-                        $sessionId,
-                        (microtime(true) - $timeStart),
-                        $tries,
-                        $lock,
-                        $this->_redis->hGet($sessionId, 'req')
-                    ),
-                    LoggerInterface::INFO
-                );
-            }
-        }
-
-        // Set session data and expiration
-        $this->_redis->pipeline();
-        if ( ! empty($setData)) {
-            $this->_redis->hMSet($sessionId, $setData);
-        }
-        $this->_redis->expire($sessionId, 3600*6); // Expiration will be set to correct value when session is written
-        $this->_redis->exec();
+        $sessionData = $sessionData ? (string) $this->_decodeData($sessionData) : '';
+        $this->_lastReadSessionDataById[$sessionId] = $sessionData;
 
         // Reset flag in case of multiple session read/write operations
         $this->_sessionWritten = false;
 
-        return $sessionData ? (string) $this->_decodeData($sessionData) : '';
+        return $sessionData;
     }
 
     /**
@@ -637,6 +662,11 @@ class Handler implements \SessionHandlerInterface
             $this->_log(sprintf(($this->_sessionWritten ? "Repeated" : "Read-only") . " session write detected; skipping for ID %s", $sessionId));
             return true;
         }
+
+        if ($this->_useLocking) {
+            $this->_lock($sessionId);
+        }
+
         $this->_sessionWritten = true;
         $timeStart = microtime(true);
 
@@ -647,6 +677,8 @@ class Handler implements \SessionHandlerInterface
             if ( ! $this->_useLocking
                 || ( ! ($pid = $this->_redis->hGet('sess_'.$sessionId, 'pid')) || $pid == $this->_getPid())
             ) {
+                $sessionData = $this->_getRefreshedSessionDataToWrite($sessionId);
+
                 $this->_writeRawSession($sessionId, $sessionData, $this->getLifeTime());
                 $this->_log(sprintf("Data written to ID %s in %.5f seconds", $sessionId, (microtime(true) - $timeStart)));
 
@@ -901,5 +933,113 @@ class Handler implements \SessionHandlerInterface
         }
 
         return $this->_breakAfter;
+    }
+
+    /**
+     * Get fresh session data, calculate a diff from last read session and session to write, and apply it onto the fresh
+     *
+     * @param string $sessionId
+     * @return string
+     */
+    protected function _getRefreshedSessionDataToWrite(string $sessionId): string
+    {
+        $currentSessionData = $this->_decodeData($this->_redis->hGet('sess_' . $sessionId, 'data'));
+        $lastReadSessionData = $this->_lastReadSessionDataById['sess_' . $sessionId];
+
+        $freshSession = unserialize($currentSessionData) ?: [];
+        $lastReadSession = unserialize($lastReadSessionData) ?: [];
+
+        $diffToUnset = $this->_arrayDiffRecursive($lastReadSession, $_SESSION);
+        if (!empty($diffToUnset)) {
+            $freshSession = $this->_arrayRemoveRecursive($freshSession, $diffToUnset);
+        }
+
+        $diffToSet = $this->_arrayDiffRecursive($_SESSION, $lastReadSession);
+        if (!empty($diffToSet)) {
+            $freshSession = array_replace_recursive($freshSession, $diffToSet);
+        }
+
+        return serialize($freshSession);
+    }
+
+    /**
+     * Remove array elements by key recursively (deep down first and removing empty arrays)
+     *
+     * @param array $arr1
+     * @param array $arr2
+     * @return array
+     */
+    protected function _arrayRemoveRecursive($arr1, $arr2)
+    {
+        foreach ($arr2 as $key => $item) {
+            if (is_array($arr2[$key])) {
+                $arr1[$key] = $this->_arrayRemoveRecursive($arr1[$key], $arr2[$key]);
+
+                if (count($arr1[$key]) === 0) {
+                    unset($arr1[$key]);
+                }
+            } else {
+                unset($arr1[$key]);
+            }
+        }
+
+        return $arr1;
+    }
+
+    /**
+     * Array diff recursively
+     *
+     * @param array $arr1
+     * @param array $arr2
+     * @return array
+     */
+    protected function _arrayDiffRecursive($arr1, $arr2)
+    {
+        $outputDiff = [];
+
+        foreach ($arr1 as $key => $value) {
+            if (array_key_exists($key, $arr2)) {
+                if (is_array($value)) {
+                    $recursiveDiff = $this->_arrayDiffRecursive($value, $arr2[$key]);
+
+                    if (count($recursiveDiff)) {
+                        $outputDiff[$key] = $recursiveDiff;
+                    }
+                } else {
+                    if (!isset($arr2[$key])) {
+                        $outputDiff[$key] = $value;
+                        continue;
+                    }
+
+                    if (is_object($value)) {
+                        if (serialize($value) !== serialize($arr2[$key])) {
+                            $outputDiff[$key] = $value;
+                        }
+                    } else {
+                        if ($value !== $arr2[$key]) {
+                            $outputDiff[$key] = $value;
+                        }
+                    }
+                }
+            }
+            else {
+                if (!isset($arr2[$key])) {
+                    $outputDiff[$key] = $value;
+                    continue;
+                }
+
+                if (is_object($value)) {
+                    if (serialize($value) !== serialize($arr2[$key])) {
+                        $outputDiff[$key] = $value;
+                    }
+                } else {
+                    if ($value !== $arr2[$key]) {
+                        $outputDiff[$key] = $value;
+                    }
+                }
+            }
+        }
+
+        return $outputDiff;
     }
 }
