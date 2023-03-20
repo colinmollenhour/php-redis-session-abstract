@@ -232,7 +232,7 @@ class Handler implements \SessionHandlerInterface
     protected $failedLockAttempts = 0;
 
     /**
-     * @var ConfigInterface
+     * @var ConfigInterface|Cm_RedisSession_Model_Session_Config
      */
     protected $config;
 
@@ -264,20 +264,10 @@ class Handler implements \SessionHandlerInterface
     {
         $this->config = $config;
         $this->logger = $logger;
-
-        $this->logger->setLogLevel($this->config->getLogLevel() ?: self::DEFAULT_LOG_LEVEL);
-        $timeStart = microtime(true);
-
-        // Database config
-        $host =             $this->config->getHost() ?: self::DEFAULT_HOST;
-        $port =             $this->config->getPort() ?: self::DEFAULT_PORT;
-        $pass =             $this->config->getPassword() ?: null;
-        $timeout =          $this->config->getTimeout() ?: self::DEFAULT_TIMEOUT;
-        $persistent =       $this->config->getPersistentIdentifier() ?: '';
-        $this->_dbNum =     $this->config->getDatabase() ?: self::DEFAULT_DATABASE;
+        $this->_readOnly = $readOnly;
 
         // General config
-        $this->_readOnly =              $readOnly;
+        $this->_dbNum =                 $this->config->getDatabase() ?: self::DEFAULT_DATABASE;
         $this->_compressionThreshold =  $this->config->getCompressionThreshold() ?: self::DEFAULT_COMPRESSION_THRESHOLD;
         $this->_compressionLibrary =    $this->config->getCompressionLibrary() ?: self::DEFAULT_COMPRESSION_LIBRARY;
         $this->_maxConcurrency =        $this->config->getMaxConcurrency() ?: self::DEFAULT_MAX_CONCURRENCY;
@@ -288,6 +278,30 @@ class Handler implements \SessionHandlerInterface
 
         // Use sleep time multiplier so fail after time is in seconds
         $this->_failAfter = (int) round((1000000 / self::SLEEP_TIME) * $this->_failAfter);
+
+        // Logger config
+        $this->logger->setLogLevel($this->config->getLogLevel() ?: self::DEFAULT_LOG_LEVEL);
+    }
+
+    /**
+     * Open session
+     *
+     * @param string $savePath ignored
+     * @param string $sessionName ignored
+     * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    #[\ReturnTypeWillChange]
+    public function open($savePath, $sessionName)
+    {
+        $timeStart = microtime(true);
+
+        // Database config
+        $host =             $this->config->getHost() ?: self::DEFAULT_HOST;
+        $port =             $this->config->getPort() ?: self::DEFAULT_PORT;
+        $pass =             $this->config->getPassword() ?: null;
+        $timeout =          $this->config->getTimeout() ?: self::DEFAULT_TIMEOUT;
+        $persistent =       $this->config->getPersistentIdentifier() ?: '';
 
         // Sentinel config
         $sentinelServers =         $this->config->getSentinelServers();
@@ -373,19 +387,7 @@ class Handler implements \SessionHandlerInterface
                 (microtime(true) - $timeStart)
             )
         );
-    }
 
-    /**
-     * Open session
-     *
-     * @param string $savePath ignored
-     * @param string $sessionName ignored
-     * @return bool
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    #[\ReturnTypeWillChange]
-    public function open($savePath, $sessionName)
-    {
         return true;
     }
 
