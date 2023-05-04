@@ -255,6 +255,11 @@ class Handler implements \SessionHandlerInterface
     private $_readOnly;
 
     /**
+     * @var string
+     */
+    private $_sessionDataHash;
+
+    /**
      * @param ConfigInterface $config
      * @param LoggerInterface $logger
      * @param boolean $readOnly
@@ -587,6 +592,7 @@ class Handler implements \SessionHandlerInterface
         list($sessionData, $sessionWrites) = array_values($this->_redis->hMGet($sessionId, array('data','writes')));
         $this->_log(sprintf("Data read for ID %s in %.5f seconds", $sessionId, (microtime(true) - $timeStart2)));
         $this->_sessionWrites = (int) $sessionWrites;
+        $this->_sessionDataHash = $this->_getSessionDataHash($sessionData);
 
         // This process is no longer waiting for a lock
         if ($tries > 0) {
@@ -646,6 +652,9 @@ class Handler implements \SessionHandlerInterface
     #[\ReturnTypeWillChange]
     public function write($sessionId, $sessionData)
     {
+        if ($this->_readOnly && $this->_getSessionDataHash($sessionData) !== $this->_sessionDataHash) {
+            $this->_log(sprintf("Session write blocked by Read-only; skipping for ID %s", $sessionId));
+        }
         if ($this->_sessionWritten || $this->_readOnly) {
             $this->_log(sprintf(($this->_sessionWritten ? "Repeated" : "Read-only") . " session write detected; skipping for ID %s", $sessionId));
             return true;
@@ -915,4 +924,18 @@ class Handler implements \SessionHandlerInterface
 
         return $this->_breakAfter;
     }
+
+    /**
+     * @param mixed $sessionData
+     * @return string
+     */
+    protected function _getSessionDataHash($sessionData) 
+    {
+        if (!$sessionData) {
+            // this is logically equivalent to the handling above which is like
+            // $sessionData ? (string) $this->_decodeData($sessionData) : ''
+            $sessionData = '';
+        }
+        return md5(serialize($sessionData));
+     }
 }
