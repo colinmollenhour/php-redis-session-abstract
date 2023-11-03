@@ -51,6 +51,7 @@ namespace Cm\RedisSession;
  */
 
 use Cm\RedisSession\Handler\ConfigInterface;
+use Cm\RedisSession\Handler\ConfigSentinelPasswordInterface;
 use Cm\RedisSession\Handler\LoggerInterface;
 
 class Handler implements \SessionHandlerInterface
@@ -294,6 +295,9 @@ class Handler implements \SessionHandlerInterface
         $sentinelMaster =          $this->config->getSentinelMaster();
         $sentinelVerifyMaster =    $this->config->getSentinelVerifyMaster();
         $sentinelConnectRetries =  $this->config->getSentinelConnectRetries();
+        $sentinelPassword =        $this->config instanceof ConfigSentinelPasswordInterface
+            ? $this->config->getSentinelPassword()
+            : $pass;
 
         // Connect and authenticate
         if ($sentinelServers && $sentinelMaster) {
@@ -306,9 +310,9 @@ class Handler implements \SessionHandlerInterface
                     $sentinelClient = new \Credis_Client($server, NULL, $timeout, $persistent);
                     $sentinelClient->forceStandalone();
                     $sentinelClient->setMaxConnectRetries(0);
-                    if ($pass) {
+                    if ($sentinelPassword) {
                         try {
-                            $sentinelClient->auth($pass);
+                            $sentinelClient->auth($sentinelPassword);
                         } catch (\CredisException $e) {
                             // Prevent throwing exception if Sentinel has no password set (error messages are different between redis 5 and redis 6)
                             if ($e->getCode() !== 0 || (
