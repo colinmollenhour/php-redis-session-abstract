@@ -512,12 +512,12 @@ class Handler implements \SessionHandlerInterface
                     // Overloaded sessions get 503 errors
                     $this->_redis->hIncrBy($sessionId, 'wait', -1);
                     $this->_sessionWritten = true; // Prevent session from getting written
-                    $writes = $this->_redis->hGet($sessionId, 'writes');
+                    [$writes, $lockedRequestUrl] = $this->_redis->hMGet($sessionId, ['writes','req']);
                     $this->_log(
                         sprintf(
                             'Session concurrency exceeded for ID %s; displaying HTTP 503 (%s waiting, %s total '
-                            . 'requests)',
-                            $sessionId, $waiting, $writes
+                            . 'requests) - Locked URL: %s',
+                            $sessionId, $waiting, $writes, $lockedRequestUrl
                         ),
                         LoggerInterface::WARNING
                     );
