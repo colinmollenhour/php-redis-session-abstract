@@ -510,14 +510,21 @@ class Handler implements \SessionHandlerInterface
                 // Limit concurrent lock waiters to prevent server resource hogging
                 if ($waiting >= $this->_maxConcurrency) {
                     // Overloaded sessions get 503 errors
-                    $this->_redis->hIncrBy($sessionId, 'wait', -1);
-                    $this->_sessionWritten = true; // Prevent session from getting written
-                    list($writes, $lockedRequestUrl) = $this->_redis->hMGet($sessionId, ['writes','req']);
+                    try {
+                        $this->_redis->hIncrBy($sessionId, 'wait', -1);
+                        $this->_sessionWritten = true; // Prevent session from getting written
+                        $sessionInfo = $this->_redis->hMGet($sessionId, ['writes','req']);
+                    } catch (Exception $e) {
+                        $this->_log("$e", LoggerInterface::WARNING);
+                    }
                     $this->_log(
                         sprintf(
                             'Session concurrency exceeded for ID %s; displaying HTTP 503 (%s waiting, %s total '
                             . 'requests) - Locked URL: %s',
-                            $sessionId, $waiting, $writes, $lockedRequestUrl
+                            $sessionId,
+                            $waiting,
+                            isset($sessionInfo['writes']) ? $sessionInfo['writes'] : '-',
+                            isset($sessionInfo['req']) ? $sessionInfo['req'] : '-'
                         ),
                         LoggerInterface::WARNING
                     );
