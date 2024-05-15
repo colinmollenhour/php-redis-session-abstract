@@ -75,6 +75,13 @@ interface ConfigInterface
     public function getTimeout();
 
     /**
+     * Get connection retries
+     *
+     * @return float
+     */
+    public function getRetries();
+
+    /**
      * Get unique string for persistent connections, if empty persistent connection is not used
      *
      * @return string
