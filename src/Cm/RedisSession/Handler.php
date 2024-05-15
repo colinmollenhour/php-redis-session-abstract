@@ -82,6 +82,11 @@ class Handler implements \SessionHandlerInterface
     const DEFAULT_TIMEOUT               = 2.5;
 
     /**
+     * Default connection retries
+     */
+    const DEFAULT_RETRIES               = 0;
+
+    /**
      * Default compression threshold
      */
     const DEFAULT_COMPRESSION_THRESHOLD = 2048;
@@ -274,6 +279,7 @@ class Handler implements \SessionHandlerInterface
         $port =             $this->config->getPort() ?: self::DEFAULT_PORT;
         $pass =             $this->config->getPassword() ?: null;
         $timeout =          $this->config->getTimeout() ?: self::DEFAULT_TIMEOUT;
+        $retries =          $this->config->getRetries() ?: self::DEFAULT_RETRIES;
         $persistent =       $this->config->getPersistentIdentifier() ?: '';
         $this->_dbNum =     $this->config->getDatabase() ?: self::DEFAULT_DATABASE;
 
@@ -361,6 +367,7 @@ class Handler implements \SessionHandlerInterface
         }
         else {
             $this->_redis = new \Credis_Client($host, $port, $timeout, $persistent, 0, $pass);
+            $this->_redis->setMaxConnectRetries($retries);
             if ($this->hasConnection() == false) {
                 throw new ConnectionFailedException('Unable to connect to Redis');
             }
