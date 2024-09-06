@@ -50,9 +50,12 @@ namespace Cm\RedisSession;
  *  - Detects inactive waiting processes to prevent false-positives in concurrency throttling.
  */
 
+use Cm\RedisSession\Handler\ClusterConfigInterface;
 use Cm\RedisSession\Handler\ConfigInterface;
 use Cm\RedisSession\Handler\ConfigSentinelPasswordInterface;
 use Cm\RedisSession\Handler\LoggerInterface;
+use Cm\RedisSession\Handler\TlsOptionsConfigInterface;
+use Cm\RedisSession\Handler\UsernameConfigInterface;
 
 class Handler implements \SessionHandlerInterface
 {
@@ -162,9 +165,19 @@ class Handler implements \SessionHandlerInterface
     const DEFAULT_LIFETIME              = 60;
 
     /**
-     * @var \Credis_Client
+     * @var \Credis_Client|\Credis_ClusterClient
      */
     protected $_redis;
+
+    /**
+     * @var bool
+     */
+    protected readonly bool $_usePipeline;
+
+    /**
+     * @var bool
+     */
+    protected readonly bool $_useCluster;
 
     /**
      * @var int
@@ -278,10 +291,12 @@ class Handler implements \SessionHandlerInterface
         $host =             $this->config->getHost() ?: self::DEFAULT_HOST;
         $port =             $this->config->getPort() ?: self::DEFAULT_PORT;
         $pass =             $this->config->getPassword() ?: null;
+        $username = $this->config instanceof UsernameConfigInterface ? $this->config->getUsername() : null;
         $timeout =          $this->config->getTimeout() ?: self::DEFAULT_TIMEOUT;
         $retries =          $this->config->getRetries() ?: self::DEFAULT_RETRIES;
         $persistent =       $this->config->getPersistentIdentifier() ?: '';
         $this->_dbNum =     $this->config->getDatabase() ?: self::DEFAULT_DATABASE;
+        $tlsOptions = $this->config instanceof TlsOptionsConfigInterface ? $this->config->getTlsOptions() : null;
 
         // General config
         $this->_readOnly =              $readOnly;
@@ -307,6 +322,8 @@ class Handler implements \SessionHandlerInterface
 
         // Connect and authenticate
         if ($sentinelServers && $sentinelMaster) {
+            $this->_usePipeline = true;
+            $this->_useCluster = false;
             $servers = preg_split('/\s*,\s*/', trim($sentinelServers), -1, PREG_SPLIT_NO_EMPTY);
             $sentinel = NULL;
             $exception = NULL;
@@ -322,20 +339,20 @@ class Handler implements \SessionHandlerInterface
                         } catch (\CredisException $e) {
                             // Prevent throwing exception if Sentinel has no password set (error messages are different between redis 5 and redis 6)
                             if ($e->getCode() !== 0 || (
-                                strpos($e->getMessage(), 'ERR Client sent AUTH, but no password is set') === false && 
+                                strpos($e->getMessage(), 'ERR Client sent AUTH, but no password is set') === false &&
                                 strpos($e->getMessage(), 'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?') === false)
                             ) {
                                 throw $e;
                             }
                         }
                     }
-                   
+
                     $sentinel = new \Credis_Sentinel($sentinelClient);
                     $sentinel
                         ->setClientTimeout($timeout)
                         ->setClientPersistent($persistent);
                     $redisMaster = $sentinel->getMasterClient($sentinelMaster);
-                    if ($pass) $redisMaster->auth($pass);
+                    if ($pass) $redisMaster->auth($pass, $username);
 
                     // Verify connected server is actually master as per Sentinel client spec
                     if ($sentinelVerifyMaster) {
@@ -343,14 +360,14 @@ class Handler implements \SessionHandlerInterface
                         if ( ! $roleData || $roleData[0] != 'master') {
                             usleep(100000); // Sleep 100ms and try again
                             $redisMaster = $sentinel->getMasterClient($sentinelMaster);
-                            if ($pass) $redisMaster->auth($pass);
+                            if ($pass) $redisMaster->auth($pass, $username);
                             $roleData = $redisMaster->role();
                             if ( ! $roleData || $roleData[0] != 'master') {
                                 throw new \Exception('Unable to determine master redis server.');
                             }
                         }
                     }
-                    if ($this->_dbNum || $persistent) $redisMaster->select(0);
+                    if (($this->_dbNum || $persistent) && !$this->_useCluster) $redisMaster->select(0);
 
                     $this->_redis = $redisMaster;
                     break 2;
@@ -366,13 +383,38 @@ class Handler implements \SessionHandlerInterface
             }
         }
         else {
-            $this->_redis = new \Credis_Client($host, $port, $timeout, $persistent, 0, $pass);
+            if (($config instanceof ClusterConfigInterface) && ($config->isCluster())) {
+                $this->_redis = new \Credis_ClusterClient(
+                    $config->getClusterName(),
+                    $config->getClusterSeeds(),
+                    $timeout,
+                    0,
+                    $config->getClusterUsePersistentConnection(),
+                    $pass,
+                    $username,
+                    $tlsOptions,
+                );
+                $this->_usePipeline = false;
+                $this->_useCluster = true;
+            } else {
+                $this->_redis = new \Credis_Client(
+                    $host,
+                    $port,
+                    $timeout,
+                    $persistent,
+                    0,
+                    $pass,
+                    $username,
+                    $tlsOptions
+                );
+                $this->_usePipeline = true;
+                $this->_useCluster = false;
+            }
             $this->_redis->setMaxConnectRetries($retries);
             if ($this->hasConnection() == false) {
                 throw new ConnectionFailedException('Unable to connect to Redis');
             }
         }
-
         // Destructor order cannot be predicted
         $this->_redis->setCloseOnDestruct(false);
         $this->_log(
@@ -459,7 +501,7 @@ class Handler implements \SessionHandlerInterface
         $timeStart = microtime(true);
         $this->_log(sprintf("Attempting to take lock on ID %s", $sessionId));
 
-        $this->_redis->select($this->_dbNum);
+        if (!$this->_useCluster) $this->_redis->select($this->_dbNum);
         while ($this->_useLocking && !$this->_readOnly)
         {
             // Increment lock value for this session and retrieve the new value
@@ -639,18 +681,19 @@ class Handler implements \SessionHandlerInterface
                 );
             }
         }
-
-        // Set session data and expiration
-        $this->_redis->pipeline();
+        if ($this->_usePipeline) {
+            // Set session data and expiration
+            $this->_redis->pipeline();
+        }
         if ( ! empty($setData)) {
             $this->_redis->hMSet($sessionId, $setData);
         }
         $this->_redis->expire($sessionId, 3600*6); // Expiration will be set to correct value when session is written
-        $this->_redis->exec();
-
+        if ($this->_usePipeline) {
+            $this->_redis->exec();
+        }
         // Reset flag in case of multiple session read/write operations
         $this->_sessionWritten = false;
-
         return $sessionData ? (string) $this->_decodeData($sessionData) : '';
     }
 
@@ -673,7 +716,7 @@ class Handler implements \SessionHandlerInterface
 
         // Do not overwrite the session if it is locked by another pid
         try {
-            if($this->_dbNum) $this->_redis->select($this->_dbNum);  // Prevent conflicts with other connections?
+            if ($this->_dbNum && !$this->_useCluster) $this->_redis->select($this->_dbNum);  // Prevent conflicts with other connections?
 
             if ( ! $this->_useLocking
                 || ( ! ($pid = $this->_redis->hGet('sess_'.$sessionId, 'pid')) || $pid == $this->_getPid())
@@ -711,10 +754,14 @@ class Handler implements \SessionHandlerInterface
     public function destroy($sessionId)
     {
         $this->_log(sprintf("Destroying ID %s", $sessionId));
-        $this->_redis->pipeline();
-        if($this->_dbNum) $this->_redis->select($this->_dbNum);
+        if ($this->_usePipeline) {
+            $this->_redis->pipeline();
+        }
+        if ($this->_dbNum && !$this->_useCluster) $this->_redis->select($this->_dbNum);
         $this->_redis->unlink(self::SESSION_PREFIX.$sessionId);
-        $this->_redis->exec();
+        if ($this->_usePipeline) {
+            $this->_redis->exec();
+        }
         return true;
     }
 
@@ -832,7 +879,7 @@ class Handler implements \SessionHandlerInterface
                 case 'lz4':    $data = lz4_compress($data); $prefix = ':l4:'; break;
                 case 'gzip':   $data = gzcompress($data, 1); break;
             }
-            if($data) {
+            if ($data) {
                 $data = $prefix.$data;
                 $this->_log(
                     sprintf(
@@ -880,15 +927,19 @@ class Handler implements \SessionHandlerInterface
     protected function _writeRawSession($id, $data, $lifetime)
     {
         $sessionId = 'sess_' . $id;
-        $this->_redis->pipeline()
-            ->select($this->_dbNum)
-            ->hMSet($sessionId, array(
+        if ($this->_usePipeline) {
+            $this->_redis->pipeline();
+        }
+        if (!$this->_useCluster) $this->_redis->select($this->_dbNum);
+        $this->_redis->hMSet($sessionId, array(
                 'data' => $this->_encodeData($data),
                 'lock' => 0, // 0 so that next lock attempt will get 1
-            ))
-            ->hIncrBy($sessionId, 'writes', 1)
-            ->expire($sessionId, min((int)$lifetime, (int)$this->_maxLifetime))
-            ->exec();
+            ));
+        $this->_redis->hIncrBy($sessionId, 'writes', 1);
+        $this->_redis->expire($sessionId, min((int)$lifetime, (int)$this->_maxLifetime));
+        if ($this->_usePipeline) {
+            $this->_redis->exec();
+        }
     }
 
     /**
