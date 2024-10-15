@@ -165,7 +165,7 @@ class Handler implements \SessionHandlerInterface
     const DEFAULT_LIFETIME              = 60;
 
     /**
-     * @var \Credis_Client|\Credis_ClusterClient
+     * @var \Credis_Client|\Credis_Cluster
      */
     protected $_redis;
 
@@ -384,7 +384,7 @@ class Handler implements \SessionHandlerInterface
         }
         else {
             if (($config instanceof ClusterConfigInterface) && ($config->isCluster())) {
-                $this->_redis = new \Credis_ClusterClient(
+                $this->_redis = new \Credis_Cluster(
                     $config->getClusterName(),
                     $config->getClusterSeeds(),
                     $timeout,
