@@ -417,15 +417,27 @@ class Handler implements \SessionHandlerInterface
         }
         // Destructor order cannot be predicted
         $this->_redis->setCloseOnDestruct(false);
-        $this->_log(
-            sprintf(
-                "%s initialized for connection to %s:%s after %.5f seconds",
-                get_class($this),
-                $this->_redis->getHost(),
-                $this->_redis->getPort(),
-                (microtime(true) - $timeStart)
-            )
-        );
+        if ($this->_useCluster) {
+            $this->_log(
+                sprintf(
+                    "%s initialized for connection to %s after %.5f seconds",
+                    get_class($this),
+                    (!empty($this->_redis->getClusterSeeds())) ?
+                        var_export($this->_redis->getClusterSeeds(), true) : $this->_redis->getClusterName(),
+                    (microtime(true) - $timeStart)
+                )
+            );
+        } else {
+            $this->_log(
+                sprintf(
+                    "%s initialized for connection to %s:%s after %.5f seconds",
+                    get_class($this),
+                    $this->_redis->getHost(),
+                    $this->_redis->getPort(),
+                    (microtime(true) - $timeStart)
+                )
+            );
+        }
     }
 
     /**
