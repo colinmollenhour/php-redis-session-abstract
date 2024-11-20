@@ -4,6 +4,9 @@
     "license":"BSD-3-Clause",
     "homepage":"https://github.com/colinmollenhour/php-redis-session-abstract",
     "description":"A Redis-based session handler with optimistic locking",
+    "scripts": {
+        "test": "vendor/bin/phpunit tests"
+    },
     "authors":[
         {
             "name":"Colin Mollenhour"
