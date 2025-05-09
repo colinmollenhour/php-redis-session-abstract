@@ -785,6 +785,21 @@ class Handler implements \SessionHandlerInterface
     #[\ReturnTypeWillChange]
     public function close()
     {
+        $id = session_id();
+        $sessionId = 'sess_' . $id;
+
+        if ( ! $this->_useLocking
+            || ( ! ($pid = $this->_redis->hGet('sess_'.$sessionId, 'pid')) || $pid == $this->_getPid())
+        ) {
+            $this->_redis->pipeline()
+                ->select($this->_dbNum)
+                ->hMSet($sessionId, array(
+                    'lock' => 0, // 0 so that next lock attempt will get 1
+                ))
+                ->expire($sessionId, min($this->getLifeTime(), $this->_maxLifetime))
+                ->exec();
+        }
+
         $this->_log("Closing connection");
         if ($this->_redis) $this->_redis->close();
         return true;
