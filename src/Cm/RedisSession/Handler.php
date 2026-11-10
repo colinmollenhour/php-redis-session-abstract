@@ -757,6 +757,43 @@ class Handler implements \SessionHandlerInterface
     }
 
     /**
+     * Release an owned lock without writing data or changing the session lifetime.
+     * Further writes are skipped until the next read.
+     *
+     * @param string $sessionId
+     * @return boolean Whether this process released the lock
+     */
+    public function releaseLock($sessionId)
+    {
+        if ( ! $this->_hasLock || $this->_sessionWritten) {
+            return false;
+        }
+
+        try {
+            if ( ! $this->_useCluster) $this->_redis->select($this->_dbNum);
+            $script = <<<'LUA'
+if redis.call('HGET', KEYS[1], 'pid') == ARGV[1] then
+    redis.call('HSET', KEYS[1], 'lock', 0)
+    redis.call('HDEL', KEYS[1], 'pid')
+    return 1
+end
+return 0
+LUA;
+            $released = (bool) $this->_redis->eval(
+                $script,
+                array(self::SESSION_PREFIX.$sessionId),
+                array($this->_getPid())
+            );
+            $this->_hasLock = false;
+            $this->_sessionWritten = true;
+            return $released;
+        } catch (\Exception $e) {
+            $this->logger->logException($e);
+            return false;
+        }
+    }
+
+    /**
      * Destroy session
      *
      * @param string $sessionId

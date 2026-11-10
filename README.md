@@ -23,6 +23,25 @@
 - The lock may be broken after `BREAK_AFTER` seconds and the process that gets the lock is indeterminate.
 - Only `MAX_CONCURRENCY` processes may be waiting for a lock for the same session or else a ConcurrentConnectionsExceededException will be thrown.
 
+### Releasing a lock without writing ###
+
+To discard changes to an active session, release its lock before calling `session_abort()`:
+
+```php
+$handler->releaseLock(session_id());
+session_abort();
+```
+
+`releaseLock($sessionId)` atomically checks that this process still owns the lock, resets `lock` to zero,
+and removes `pid`. It leaves session data, the `writes` counter, other hash fields, and the current Redis
+TTL unchanged. It returns `true` when the lock was released, or `false` if the handler has no active lock,
+ownership has changed, or Redis reports an error (which is logged). It does not create missing sessions.
+After checking ownership, the handler skips further writes until the next `read()`.
+
+For callers such as `Varien::_refuseSession()`, use this sequence in place of `session_write_close()`.
+`session_abort()` alone closes the handler without releasing its Redis lock. The TTL preserved here is
+the TTL at the time of release; `read()` sets a temporary six-hour expiration when opening a session.
+
 ### Compression ##
 
 Session data compresses very well so using compression is a great way to increase your capacity without
